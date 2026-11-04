@@ -1,8 +1,10 @@
 """
 Fahrerliste mit UCI-Rang aus ProCyclingStats in die Tabelle riders laden.
-Der Rang wird als prev_year_rank gespeichert und bestimmt die Draft-Reihenfolge.
+Der Rang (uci_rank) bestimmt beim Live-Draft die Reihenfolge, in der die Fahrer
+aufgerufen werden, und hilft beim Filtern freier Fahrer.
 
-Am besten kurz vor dem Draft (z. B. im Dezember) einmal manuell starten.
+Läuft wöchentlich automatisch; vor dem Draft zusätzlich per Knopfdruck starten.
+Neue Fahrer im Ranking sind damit automatisch freie Fahrer.
 """
 import time
 from datetime import datetime, timezone
@@ -47,12 +49,18 @@ def main():
                 "gender": gender,
                 "nation": r.get("nationality"),
                 "team": r.get("team_name"),
-                "prev_year_rank": r.get("rank"),
+                "uci_rank": r.get("rank"),
+                "ranking_points": r.get("points"),
                 "updated_at": now,
             }
             for r in rows if r.get("rider_url")
         ]
+        if not riders:
+            print("  Keine Fahrer erhalten – bestehende Liste bleibt unverändert.")
+            continue
         db.upsert("riders", riders, "pcs_slug")
+        # Fahrer, die aus den Top-Plätzen gefallen sind, behalten ihren Eintrag ohne Rang
+        db.update("riders", {"gender": f"eq.{gender}", "updated_at": f"lt.{now}"}, {"uci_rank": None})
         print(f"  {len(riders)} Fahrer gespeichert.")
         time.sleep(PAUSE)
 

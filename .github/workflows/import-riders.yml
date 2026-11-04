@@ -1,7 +1,9 @@
 name: Fahrerliste importieren
 
 on:
-  workflow_dispatch:        # nur per Knopfdruck, z. B. vor dem Draft
+  schedule:
+    - cron: "30 4 * * 1"    # montags 04:30 UTC: aktuelles UCI-Ranking (neue Fahrer = freie Fahrer)
+  workflow_dispatch:        # zusätzlich per Knopfdruck, z. B. direkt vor dem Draft
 
 jobs:
   import:

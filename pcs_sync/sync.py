@@ -2,7 +2,9 @@
 Täglicher Abruf: holt für alle Fahrer, die in einem Fantasy-Kader stehen,
 die Saisonergebnisse von ProCyclingStats und speichert jedes Ergebnis
 mit seinen UCI-Punkten in der Tabelle results.
-Danach werden die Spieltags-Status (geplant/läuft/abgeschlossen) aktualisiert.
+Ergebnisse, die PCS nicht mehr ausweist (z. B. aberkannt), werden gelöscht –
+eingefrorene Spieltage bleiben davon unberührt.
+Danach rechnet die Datenbank Stichtage ab und schließt/friert Spieltage ein.
 """
 import time
 from datetime import date, timedelta
@@ -38,6 +40,7 @@ def main():
     slugs = owned_riders(today)
     print(f"{len(slugs)} Fahrer in Kadern.")
     if not slugs:
+        db.rpc("run_maintenance")
         return
 
     genders = {r["pcs_slug"]: r["gender"] for r in db.select(
@@ -45,6 +48,7 @@ def main():
     known_races = {r["pcs_slug"] for r in db.select("races", {"select": "pcs_slug"})}
 
     races, results, race_info = {}, [], {}
+    fetched_ok = set()   # Fahrer, deren Ergebnisliste vollständig geladen wurde
 
     def race_details(race_slug):
         """Start-/Enddatum eines Rennens (nur für neue Rennen abgerufen)."""
@@ -66,6 +70,7 @@ def main():
         except Exception as e:
             print(f"  {slug}: Fehler beim Abruf – {e}")
             continue
+        fetched_ok.add(slug)
 
         for row in rows:
             try:
@@ -108,12 +113,32 @@ def main():
     db.upsert("results", results, "rider_slug,race_slug,label")
     print(f"{len(races)} neue Rennen, {len(results)} Ergebnisse gespeichert.")
 
-    # Spieltags-Status nachziehen
-    t = today.isoformat()
-    db.update("matchdays", {"status": "eq.planned", "starts_on": f"lte.{t}"}, {"status": "running"})
-    db.update("matchdays", {"status": "eq.running", "ends_on": f"lt.{t}"}, {"status": "closed"})
+    # Delta-Korrektur: Ergebnisse dieser Saison, die bei PCS nicht mehr auftauchen
+    current = {(r["rider_slug"], r["race_slug"], r["label"]) for r in results}
+    stale = []
+    for chunk in (sorted(fetched_ok)[i:i + 100] for i in range(0, len(fetched_ok), 100)):
+        for row in db.select("results", {
+            "select": "id,rider_slug,race_slug,label",
+            "rider_slug": f"in.({','.join(chunk)})",
+            "result_date": f"gte.{year}-01-01",
+        }):
+            if (row["rider_slug"], row["race_slug"], row["label"]) not in current:
+                stale.append(row["id"])
+    for i in range(0, len(stale), 200):
+        db.delete("results", {"id": f"in.({','.join(map(str, stale[i:i + 200]))})"})
+    if stale:
+        print(f"{len(stale)} nicht mehr gültige Ergebnisse entfernt.")
+
+    # Stichtage, Spieltags-Status, Einfrieren nach 7 Tagen
+    db.rpc("run_maintenance")
     print("Spieltage aktualisiert.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        try:
+            db.update("sync_status", {"id": "eq.1"}, {"ok": False, "message": str(e)[:500]})
+        finally:
+            raise

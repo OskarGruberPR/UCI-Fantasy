@@ -36,3 +36,17 @@ def update(table, filters, values):
     headers = {**HEADERS, "Prefer": "return=minimal"}
     r = requests.patch(f"{URL}/rest/v1/{table}", headers=headers, params=filters, json=values, timeout=30)
     r.raise_for_status()
+
+
+def delete(table, filters):
+    headers = {**HEADERS, "Prefer": "return=minimal"}
+    r = requests.delete(f"{URL}/rest/v1/{table}", headers=headers, params=filters, timeout=30)
+    r.raise_for_status()
+
+
+def rpc(function, args=None):
+    """Ruft eine Datenbankfunktion auf (z. B. run_maintenance)."""
+    r = requests.post(f"{URL}/rest/v1/rpc/{function}", headers=HEADERS, json=args or {}, timeout=120)
+    if not r.ok:
+        raise RuntimeError(f"RPC {function} fehlgeschlagen: {r.status_code} {r.text}")
+    return r.json() if r.text else None

@@ -1,0 +1,18 @@
+name: Datenbank einrichten
+
+# Spielt supabase/schema.sql in die Datenbank ein. Alternativ: Inhalt der Datei
+# im Supabase SQL-Editor einfügen und "Run" klicken – das Ergebnis ist dasselbe.
+# Braucht das Secret SUPABASE_DB_URL (Supabase → Connect → Session pooler, mit Passwort).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y postgresql-client
+      - run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/schema.sql
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
