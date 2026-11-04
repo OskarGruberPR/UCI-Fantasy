@@ -1,2 +1,3 @@
 procyclingstats
+selectolax<1.0   # procyclingstats nutzt noch den alten Parser, ab 1.0 entfernt
 requests
