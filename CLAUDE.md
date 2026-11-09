@@ -32,7 +32,14 @@
 ## Lokal testen
 
 - Syntax: `node --check web/views/<datei>.js`, `python3 -c "import ast; ast.parse(open('datasync/<datei>.py').read())"`.
-- Datenbank-Build: `node --test supabase/build-schema.test.mjs` und `node supabase/build-schema.mjs --check`.
+- Datenbank-Build und Test-Runner: `node --test supabase/build-schema.test.mjs supabase/test-db.test.mjs`
+  und `node supabase/build-schema.mjs --check`.
+- Fachliche Datenbanktests: `node supabase/test-db.mjs` (PostgreSQL ab Version 17, Verbindung über `PGHOST`,
+  `PGPORT`, `PGUSER`, `PGPASSWORD` oder `.pgpass`). Unter Windows nutzt
+  `powershell -NoProfile -ExecutionPolicy Bypass -File supabase/test-db.ps1` bei Bedarf den verschlüsselten lokalen Zugang.
+  Der Runner akzeptiert nur localhost, erstellt eine eigene Testdatenbank und entfernt sie anschließend.
+  Testfälle unter `supabase/tests/database/` mit Transaktion und Rollback schreiben; Testdaten und Platzhalter
+  liegen in `supabase/tests/support/`. Diese Dateien gehören nicht in die produktive Modulliste.
 - Datenbank: Nach Moduländerungen `node supabase/build-schema.mjs` ausführen, dann das Schema in eine lokale
   Postgres-Instanz einspielen (`psql -v ON_ERROR_STOP=1 -f supabase/schema.sql`);
   für Supabase-Spezifika (`auth.uid()`, Schema `auth`) braucht es kleine Platzhalter.
