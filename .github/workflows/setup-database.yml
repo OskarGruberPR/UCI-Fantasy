@@ -1,13 +1,15 @@
 name: Datenbank einrichten
 
-# Spielt supabase/schema.sql in die Datenbank ein – automatisch bei jeder Änderung
-# des Schemas auf main, zusätzlich per Knopfdruck. Das Skript ist wiederholbar.
+# Prüft die SQL-Module und die erzeugte supabase/schema.sql auch in Pull Requests.
+# Spielt das Schema auf main und per Knopfdruck ein. Das Skript ist wiederholbar.
 # Braucht das Secret SUPABASE_DB_URL (Supabase → Connect → Session pooler, mit Passwort).
 
 on:
   push:
     branches: [main]
-    paths: [supabase/schema.sql]
+    paths: ['supabase/**', '.github/workflows/setup-database.yml']
+  pull_request:
+    paths: ['supabase/**', '.github/workflows/setup-database.yml']
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +17,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    name: SQL-Build prüfen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build-Skript testen
+        run: node --test supabase/build-schema.test.mjs
+      - name: Erzeugtes Schema mit den Modulen vergleichen
+        run: node supabase/build-schema.mjs --check
+
   migrate:
+    needs: validate
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

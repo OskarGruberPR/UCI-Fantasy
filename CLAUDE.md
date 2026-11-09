@@ -10,8 +10,11 @@
   (Reiter „Regeln“) aktualisieren. Die Regeln sind dynamisch: Texte hängen von den Liga-Einstellungen ab
   (`scoring_mode`, `transfer_mode`, `waiver_mode`, `draft_mode`).
 - Der Draft-Report (Noten, „beste Aufstellung“) ist bewusst **nicht** in den Regeln beschrieben – Überraschung für die Mitspieler.
-- Datenbankänderungen nur über `supabase/schema.sql`, und zwar **idempotent** (`create or replace`, `add column if not exists`,
-  `drop function if exists` bei geänderter Signatur). Nach dem Merge spielt „Datenbank einrichten“ sie automatisch ein.
+- Datenbankänderungen in den Modulen unter `supabase/sql/`, und zwar **idempotent** (`create or replace`, `add column if not exists`,
+  `drop function if exists` bei geänderter Signatur). Aufbau und Zuordnung: siehe `supabase/README.md`.
+  Die Ausführungsreihenfolge steht ausdrücklich in `supabase/schema.modules.json`; neue SQL-Dateien dort eintragen.
+  Danach `node supabase/build-schema.mjs` ausführen und die erzeugte `supabase/schema.sql` mit einchecken;
+  diese Datei nicht direkt bearbeiten. Nach dem Merge spielt „Datenbank einrichten“ sie automatisch ein.
 - Spielregeln werden in der Datenbank erzwungen (security-definer-Funktionen), nicht in der App.
 - `web/config.js` ist nur für lokale Tests und darf nicht eingecheckt werden. Keine Secrets in Code oder Chat.
 - Mobile first: Die App wird fast nur auf dem iPhone (installiert als Web-App) genutzt. Nichts darf rechts
@@ -21,7 +24,7 @@
 
 1. Auf einem Arbeitszweig ändern, lokal prüfen (siehe unten).
 2. Pull Request auf `main` erstellen und mergen (Squash). Danach laufen automatisch:
-   „App veröffentlichen“ (GitHub Pages, wenige Minuten) und bei `schema.sql`-Änderungen „Datenbank einrichten“.
+   „App veröffentlichen“ (GitHub Pages, wenige Minuten) und bei Änderungen unter `supabase/` „Datenbank einrichten“.
 3. Live-Daten prüfen: Workflow „Datenbank abfragen (nur lesen)“ (`db-query.yml`) mit einer SQL-Abfrage starten,
    Ergebnis steht im Job-Log. Für einen Überblick: „Datenstand prüfen“ (`db-status.yml`).
 4. Dem Nutzer sagen, dass er die App neu laden soll (installierte App: ganz schließen und neu öffnen).
@@ -29,7 +32,9 @@
 ## Lokal testen
 
 - Syntax: `node --check web/views/<datei>.js`, `python3 -c "import ast; ast.parse(open('datasync/<datei>.py').read())"`.
-- Datenbank: Schema in eine lokale Postgres-Instanz einspielen (`psql -v ON_ERROR_STOP=1 -f supabase/schema.sql`);
+- Datenbank-Build: `node --test supabase/build-schema.test.mjs` und `node supabase/build-schema.mjs --check`.
+- Datenbank: Nach Moduländerungen `node supabase/build-schema.mjs` ausführen, dann das Schema in eine lokale
+  Postgres-Instanz einspielen (`psql -v ON_ERROR_STOP=1 -f supabase/schema.sql`);
   für Supabase-Spezifika (`auth.uid()`, Schema `auth`) braucht es kleine Platzhalter.
 - Oberfläche: `web/config.example.js` → `web/config.js`, statisch ausliefern (`python3 -m http.server -d web`) und mit
   Playwright in der iPhone-Ansicht durchklicken. Die PostgREST-API lässt sich durch einen kleinen Mock ersetzen.
